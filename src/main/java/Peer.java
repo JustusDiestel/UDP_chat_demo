@@ -21,7 +21,11 @@ public class Peer {
 
     public void handle(Packet pkt, InetSocketAddress senderAddr) throws Exception {
 
-        if (pkt.type != PacketType.ACK) sendAck(pkt.id, senderAddr);
+        if (pkt.type != PacketType.ACK
+                && pkt.type != PacketType.JOIN_ACK
+                && pkt.type != PacketType.ROUTE_UPDATE) {
+            sendAck(pkt.id, senderAddr);
+        }
 
         switch (pkt.type) {
 
@@ -32,14 +36,13 @@ public class Peer {
                 router.addNeighbor(pkt.src, senderAddr);
 
                 // Antworte mit JOIN_ACK (löst KEINEN neuen JOIN aus)
-                Packet ack = new Packet(
-                        PacketType.JOIN_ACK,
-                        sender.newId(),
+                Packet ack = new Packet(PacketType.JOIN_ACK,
+                        pkt.id,     // gleiche ID wie JOIN
                         name,
                         "ALL",
                         ""
                 );
-                sender.sendReliable(ack, senderAddr);
+                sender.send(ack, senderAddr);
 
                 broadcastRouting();
             }
@@ -71,7 +74,7 @@ public class Peer {
 
     public void sendAck(String id, InetSocketAddress addr) throws Exception {
         Packet ack = new Packet(PacketType.ACK, id, name, "", "");
-        sender.sendReliable(ack, addr);
+        sender.send(ack, addr);
     }
 
     public void sendMessage(String dest, String msg) throws Exception {
@@ -99,7 +102,7 @@ public class Peer {
                 ""
         );
 
-        sender.sendReliable(join, addr);
+        sender.send(join, addr);
     }
 
     public void broadcastRouting() throws Exception {
@@ -112,7 +115,7 @@ public class Peer {
         );
 
         for (var n : router.neighbors().values()) {
-            sender.sendReliable(vec, n);
+            sender.send(vec, n);
         }
     }
 }
