@@ -22,4 +22,26 @@ public class PeerSender {
         DatagramPacket dp = new DatagramPacket(data, data.length, addr);
         socket.send(dp);
     }
+
+    public void sendReliable(Packet pkt, InetSocketAddress addr) throws Exception {
+
+        int tries = 0;
+        String id = pkt.id;
+
+        while (tries < 5) {
+            send(pkt, addr);  // UDP send
+            long start = System.currentTimeMillis();
+
+            // warten auf ACK
+            while (System.currentTimeMillis() - start < 300) {
+                if (peer.acked.contains(id)) return;  // ACK angekommen
+                Thread.sleep(5);
+            }
+
+            tries++;
+        }
+
+        System.out.println("Paket " + id + " verloren (keine ACK)");
+    }
+
 }

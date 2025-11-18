@@ -39,7 +39,7 @@ public class Peer {
                         "ALL",
                         ""
                 );
-                sender.send(ack, senderAddr);
+                sender.sendReliable(ack, senderAddr);
 
                 broadcastRouting();
             }
@@ -66,12 +66,12 @@ public class Peer {
 
     public void forward(Packet pkt) throws Exception {
         InetSocketAddress next = router.nextHop(pkt.dest);
-        if (next != null) sender.send(pkt, next);
+        if (next != null) sender.sendReliable(pkt, next);
     }
 
     public void sendAck(String id, InetSocketAddress addr) throws Exception {
         Packet ack = new Packet(PacketType.ACK, id, name, "", "");
-        sender.send(ack, addr);
+        sender.sendReliable(ack, addr);
     }
 
     public void sendMessage(String dest, String msg) throws Exception {
@@ -84,7 +84,7 @@ public class Peer {
         }
 
         Packet p = new Packet(PacketType.MSG, sender.newId(), name, dest, msg);
-        sender.send(p, next);
+        sender.sendReliable(p, next);
     }
 
     public void connect(String ip, int port) throws Exception {
@@ -99,7 +99,7 @@ public class Peer {
                 ""
         );
 
-        sender.send(join, addr);
+        sender.sendReliable(join, addr);
     }
 
     public void broadcastRouting() throws Exception {
@@ -112,7 +112,7 @@ public class Peer {
         );
 
         for (var n : router.neighbors().values()) {
-            sender.send(vec, n);
+            sender.sendReliable(vec, n);
         }
     }
 }
