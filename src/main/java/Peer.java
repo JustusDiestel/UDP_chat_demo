@@ -11,12 +11,15 @@ public class Peer {
     PeerSender sender;
 
     Set<String> acked = ConcurrentHashMap.newKeySet();
+    private boolean heartbeatOn = false;
 
     public Peer(String name, int port) throws Exception {
         this.name = name;
         socket = new DatagramSocket(port);
         router = new Router(name);
         sender = new PeerSender(socket, this);
+
+        startHeartbeat();
     }
 
     public void handle(Packet pkt, InetSocketAddress senderAddr) throws Exception {
@@ -35,9 +38,8 @@ public class Peer {
                 System.out.println(pkt.src + " joined");
                 router.addNeighbor(pkt.src, senderAddr);
 
-                // Antworte mit JOIN_ACK (löst KEINEN neuen JOIN aus)
                 Packet ack = new Packet(PacketType.JOIN_ACK,
-                        pkt.id,     // gleiche ID wie JOIN
+                        pkt.id,
                         name,
                         "ALL",
                         ""
@@ -46,8 +48,8 @@ public class Peer {
 
                 broadcastRouting();
             }
+
             case JOIN_ACK -> {
-                // Derjenige, den ich kontaktiert habe, bestätigt jetzt:
                 router.addNeighbor(pkt.src, senderAddr);
                 broadcastRouting();
             }
@@ -117,5 +119,29 @@ public class Peer {
         for (var n : router.getNeighbors().values()) {
             sender.send(vec, n);
         }
+    }
+
+    // ----------------------------------------------------
+    // Heartbeat + Timeout Check
+    // ----------------------------------------------------
+    private void startHeartbeat() {
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    // Dead-Node check
+                    if (router.checkTimeouts()) {
+                        broadcastRouting(); // Triggered Update
+                    }
+
+                    broadcastRouting(); // Regelmäßig
+                    Thread.sleep(10000);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        t.setDaemon(true);
+        t.start();
     }
 }

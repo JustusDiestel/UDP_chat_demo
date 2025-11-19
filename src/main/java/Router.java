@@ -7,14 +7,18 @@ public class Router {
     private final Map<String, RouteEntry> table = new HashMap<>();
     private final Map<String, InetSocketAddress> neighbors = new HashMap<>();
 
+    // -------- für Dead-Node-Detection --------
+    private final Map<String, Long> lastSeen = new HashMap<>();
+    private static final long TIMEOUT = 15000; // 15 Sekunden
+
     public Router(String myName) {
         table.put(myName, new RouteEntry(myName, 0));
     }
 
-    // add direct neighbors
     public void addNeighbor(String name, InetSocketAddress addr) {
         neighbors.put(name, addr);
         table.put(name, new RouteEntry(name, 1));
+        lastSeen.put(name, System.currentTimeMillis());
     }
 
     public Map<String, InetSocketAddress> getNeighbors() {
@@ -27,14 +31,19 @@ public class Router {
         return neighbors.get(hop);
     }
 
+    // ----------------------------------------------------
+    // Process incoming Distance Vector
+    // ----------------------------------------------------
     public boolean processVector(String from, String vector) {
+
+        lastSeen.put(from, System.currentTimeMillis());
 
         boolean changed = false;
 
-        // first-hop bestimmen:
+        // determine first hop to "from"
         String firstHop = table.containsKey(from)
-                ? table.get(from).nextHop     // bereits bekannte Route → first hop übernehmen
-                : from;                       // direkter Nachbar → Hop ist der Sender
+                ? table.get(from).nextHop
+                : from;
 
         String[] entries = vector.split(",");
         for (String e : entries) {
@@ -42,7 +51,7 @@ public class Router {
 
             String[] p = e.split(":");
             String node = p[0];
-            int cost = Integer.parseInt(p[1]) + 1; // +1 hop
+            int cost = Integer.parseInt(p[1]) + 1;
 
             if (!table.containsKey(node)) {
                 table.put(node, new RouteEntry(firstHop, cost));
@@ -50,6 +59,32 @@ public class Router {
 
             } else if (cost < table.get(node).cost) {
                 table.put(node, new RouteEntry(firstHop, cost));
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    // --------------------------------------------------------------------
+    // ---- DEAD NODE TIMEOUT (wird vom HEARTBEAT aufgerufen!) ------------
+    // --------------------------------------------------------------------
+    public boolean checkTimeouts() {
+        boolean changed = false;
+
+        for (String n : neighbors.keySet().toArray(new String[0])) {
+
+            long seen = lastSeen.getOrDefault(n, 0L);
+
+            if (System.currentTimeMillis() - seen > TIMEOUT) {
+
+                System.out.println("[TIMEOUT] " + n + " ist tot → entferne Routen");
+
+                neighbors.remove(n);
+                table.remove(n);
+
+                table.entrySet().removeIf(e -> e.getValue().nextHop.equals(n));
+
                 changed = true;
             }
         }
