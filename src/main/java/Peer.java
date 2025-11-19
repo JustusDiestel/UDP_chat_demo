@@ -114,7 +114,7 @@ public class Peer {
                 router.exportVector()
         );
 
-        for (var n : router.neighbors().values()) {
+        for (var n : router.getNeighbors().values()) {
             sender.send(vec, n);
         }
     }

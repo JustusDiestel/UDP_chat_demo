@@ -17,7 +17,7 @@ public class Router {
         table.put(name, new RouteEntry(name, 1));
     }
 
-    public Map<String, InetSocketAddress> neighbors() {
+    public Map<String, InetSocketAddress> getNeighbors() {
         return neighbors;
     }
 
